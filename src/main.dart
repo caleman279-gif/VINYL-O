@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const VinylO());
-}
+void main() => runApp(const VinylO());
 
 class VinylO extends StatelessWidget {
   const VinylO({super.key});
@@ -18,9 +16,7 @@ class VinylO extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF101010),
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.redAccent,
-        ),
+        colorScheme: const ColorScheme.dark(primary: Colors.redAccent),
       ),
       home: const CollectionPage(),
     );
@@ -38,7 +34,7 @@ class _CollectionPageState extends State<CollectionPage> {
   final String username = 'Charlie_LP';
   List<Map<String, dynamic>> records = [];
   bool loading = false;
-  String message = 'Tus vinilos aparecerán aquí.';
+  String message = 'Tu colección musical te espera.';
   int imported = 0;
 
   @override
@@ -52,10 +48,9 @@ class _CollectionPageState extends State<CollectionPage> {
     final saved = prefs.getString('vinyl_collection');
     if (saved != null) {
       final decoded = jsonDecode(saved) as List;
+      if (!mounted) return;
       setState(() {
-        records = decoded
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
+        records = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
       });
     }
   }
@@ -75,7 +70,7 @@ class _CollectionPageState extends State<CollectionPage> {
     });
 
     try {
-      final List<Map<String, dynamic>> newRecords = [];
+      final newRecords = <Map<String, dynamic>>[];
       int page = 1;
       int totalPages = 1;
 
@@ -91,24 +86,17 @@ class _CollectionPageState extends State<CollectionPage> {
           },
         );
 
-        final response = await http.get(
-          uri,
-          headers: {
-            'User-Agent': 'VINYL-O/0.1 (vinyl collection app)',
-            'Accept': 'application/vnd.discogs.v2.discogs+json',
-          },
-        );
+        final response = await http.get(uri, headers: {
+          'User-Agent': 'VINYL-O/0.1 (vinyl collection app)',
+          'Accept': 'application/vnd.discogs.v2.discogs+json',
+        });
 
         if (response.statusCode != 200) {
-          throw Exception(
-            'Discogs respondió con el código ${response.statusCode}. '
-            'Comprueba que tu colección sea pública.',
-          );
+          throw Exception('Error de Discogs: ${response.statusCode}. Comprueba que tu colección sea pública.');
         }
 
         final data = jsonDecode(response.body);
-        final pagination = data['pagination'];
-        totalPages = pagination['pages'] ?? 1;
+        totalPages = data['pagination']['pages'] ?? 1;
         final releases = data['releases'] as List? ?? [];
 
         for (final item in releases) {
@@ -120,41 +108,35 @@ class _CollectionPageState extends State<CollectionPage> {
             'instanceId': item['id']?.toString() ?? '',
             'releaseId': basic['id']?.toString() ?? '',
             'title': basic['title'] ?? 'Título desconocido',
-            'artist': artists
-                .map((a) => a['name'] ?? '')
-                .join(', '),
+            'artist': artists.map((a) => a['name'] ?? '').join(', '),
             'year': basic['year']?.toString() ?? '',
-            'label': labels.isNotEmpty
-                ? labels.first['name'] ?? ''
-                : '',
-            'cover': basic['cover_image'] ??
-                basic['thumb'] ??
-                '',
+            'label': labels.isNotEmpty ? labels.first['name'] ?? '' : '',
+            'cover': basic['cover_image'] ?? basic['thumb'] ?? '',
           });
         }
 
+        if (!mounted) return;
         setState(() {
           imported = newRecords.length;
           message = 'Importando página $page de $totalPages...';
         });
-
         page++;
       } while (page <= totalPages);
 
       records = newRecords;
       await saveRecords();
 
+      if (!mounted) return;
       setState(() {
-        message = 'Importación terminada: ${records.length} vinilos.';
+        message = '¡Colección importada correctamente!';
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         message = 'No se pudo importar: $e';
       });
     } finally {
-      setState(() {
-        loading = false;
-      });
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -162,29 +144,30 @@ class _CollectionPageState extends State<CollectionPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.black,
+        centerTitle: true,
         title: const Text(
           'VINYL-O',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            letterSpacing: 3,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 4),
         ),
-        centerTitle: true,
-        backgroundColor: Colors.black,
       ),
       body: Column(
         children: [
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
+          Image.asset(
+            'assets/vinyl_o_logo.png',
+            height: 115,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(height: 18),
           const Text(
             'MI COLECCIÓN',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          Text('Discogs: $username'),
-          const SizedBox(height: 16),
+          Text('DISCOGS  ·  $username',
+              style: const TextStyle(color: Colors.white70)),
+          const SizedBox(height: 18),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: SizedBox(
@@ -192,13 +175,11 @@ class _CollectionPageState extends State<CollectionPage> {
               child: ElevatedButton.icon(
                 onPressed: loading ? null : importDiscogs,
                 icon: const Icon(Icons.sync),
-                label: Text(
-                  loading ? 'IMPORTANDO...' : 'IMPORTAR DESDE DISCOGS',
-                ),
+                label: Text(loading ? 'IMPORTANDO...' : 'IMPORTAR DESDE DISCOGS'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.all(15),
+                  padding: const EdgeInsets.all(16),
                 ),
               ),
             ),
@@ -206,18 +187,12 @@ class _CollectionPageState extends State<CollectionPage> {
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              message,
-              textAlign: TextAlign.center,
-            ),
+            child: Text(message, textAlign: TextAlign.center),
           ),
           if (loading)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: LinearProgressIndicator(
-                value: null,
-                color: Colors.redAccent,
-              ),
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: LinearProgressIndicator(color: Colors.redAccent),
             ),
           Padding(
             padding: const EdgeInsets.all(12),
@@ -231,9 +206,7 @@ class _CollectionPageState extends State<CollectionPage> {
           ),
           Expanded(
             child: records.isEmpty
-                ? const Center(
-                    child: Text('Todavía no hay vinilos importados.'),
-                  )
+                ? const Center(child: Text('Todavía no hay vinilos importados.'))
                 : ListView.builder(
                     itemCount: records.length,
                     itemBuilder: (context, index) {
@@ -243,9 +216,7 @@ class _CollectionPageState extends State<CollectionPage> {
                       return Card(
                         color: const Color(0xFF202020),
                         margin: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
+                            horizontal: 12, vertical: 6),
                         child: ListTile(
                           leading: SizedBox(
                             width: 55,
@@ -259,19 +230,11 @@ class _CollectionPageState extends State<CollectionPage> {
                                         const Icon(Icons.album, size: 40),
                                   ),
                           ),
-                          title: Text(
-                            record['title'] ?? '',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          title: Text(record['title'] ?? ''),
                           subtitle: Text(
-                            '${record['artist'] ?? ''} · '
-                            '${record['year'] ?? ''}',
+                            '${record['artist'] ?? ''} · ${record['year'] ?? ''}',
                           ),
-                          trailing: const Icon(
-                            Icons.album,
-                            color: Colors.redAccent,
-                          ),
+                          trailing: const Icon(Icons.album, color: Colors.redAccent),
                         ),
                       );
                     },
