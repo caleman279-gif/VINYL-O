@@ -29,13 +29,21 @@ jobs:
         run: flutter create . --project-name vinyl_o --platforms android
 
       - name: Instalar dependencias
-        run: flutter pub add http shared_preferences
+        run: |
+          flutter pub add http shared_preferences
+          flutter pub add --dev flutter_launcher_icons
 
-      - name: Copiar código de VINYL-O
-        run: cp src/main.dart lib/main.dart
+      - name: Copiar código y logo
+        run: |
+          cp src/main.dart lib/main.dart
+          mkdir -p assets
+          cp vinyl_o_logo.png assets/vinyl_o_logo.png
 
-      - name: Preparar dependencias
-        run: flutter pub get
+      - name: Configurar logo e icono
+        run: |
+          python3 -c "p='pubspec.yaml'; s=open(p).read(); s=s.replace('  uses-material-design: true', '  uses-material-design: true\n  assets:\n    - assets/vinyl_o_logo.png'); s += '\nflutter_launcher_icons:\n  android: true\n  ios: false\n  image_path: assets/vinyl_o_logo.png\n'; open(p,'w').write(s)"
+          flutter pub get
+          dart run flutter_launcher_icons
 
       - name: Construir APK
         run: flutter build apk --release
